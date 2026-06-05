@@ -764,7 +764,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 				if (wireguard_peer_init(device, peer, public_key, p->preshared_key)) {
 
 					peer->connect_ip = p->endpoint_ip;
-					peer->connect_port = p->endport_port;
+					peer->connect_port = p->endpoint_port;
 					peer->ip = peer->connect_ip;
 					peer->port = peer->connect_port;
 					if (p->keep_alive == WIREGUARDIF_KEEPALIVE_DEFAULT) {
@@ -919,10 +919,7 @@ err_t wireguardif_init(struct netif *netif) {
 	struct udp_pcb *udp;
 	uint8_t private_key[WIREGUARD_PRIVATE_KEY_LEN];
 	size_t private_key_len = sizeof(private_key);
-
 	struct netif* underlying_netif;
-	tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
-	log_i(TAG "underlying_netif = %p", underlying_netif);
 
 	LWIP_ASSERT("netif != NULL", (netif != NULL));
 	LWIP_ASSERT("state != NULL", (netif->state != NULL));
@@ -938,6 +935,15 @@ err_t wireguardif_init(struct netif *netif) {
 
 		// Clear out and set if function is successful
 		netif->state = NULL;
+
+		// underlying_netif from bind_netif or fallback to STA
+		if (init_data->bind_netif != NULL) {
+			underlying_netif = init_data->bind_netif;
+			log_i(TAG "underlying_netif = %p (from bind_netif)", underlying_netif);
+		} else {
+			tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
+			log_i(TAG "underlying_netif = %p (from TCPIP_ADAPTER_IF_STA)", underlying_netif);
+		}
 
 		if (wireguard_base64_decode(init_data->private_key, private_key, &private_key_len)
 				&& (private_key_len == WIREGUARD_PRIVATE_KEY_LEN)) {
@@ -1019,7 +1025,7 @@ void wireguardif_peer_init(struct wireguardif_peer *peer) {
 	// Caller must provide 'public_key'
 	peer->public_key = NULL;
 	ip_addr_set_any(false, &peer->endpoint_ip);
-	peer->endport_port = WIREGUARDIF_DEFAULT_PORT;
+	peer->endpoint_port = WIREGUARDIF_DEFAULT_PORT;
 	peer->keep_alive = WIREGUARDIF_KEEPALIVE_DEFAULT;
 	ip_addr_set_any(false, &peer->allowed_ip);
 	ip_addr_set_any(false, &peer->allowed_mask);

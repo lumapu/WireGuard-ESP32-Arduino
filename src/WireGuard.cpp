@@ -99,7 +99,7 @@ bool WireGuard::begin(const IPAddress& localIP, const IPAddress& Subnet, const I
         peer.allowed_mask = allowed_mask;
     }
 	
-	peer.endport_port = remotePeerPort;
+	peer.endpoint_port = remotePeerPort;
 
     // Initialize the platform
     wireguard_platform_init();
