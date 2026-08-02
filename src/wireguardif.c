@@ -201,8 +201,10 @@ static err_t wireguardif_output(struct netif *netif, struct pbuf *q, const ip4_a
 	ip_addr_copy_from_ip4(ipaddr, *ip4addr);
 	struct wireguard_peer *peer = peer_lookup_by_allowed_ip(device, &ipaddr);
 	if (peer) {
+		log_i(TAG "tx route dst=%s via peer (allowed match)", ipaddr_ntoa(&ipaddr));
 		return wireguardif_output_to_peer(netif, q, &ipaddr, peer);
 	} else {
+		log_i(TAG "tx route miss dst=%s (no AllowedIPs peer match)", ipaddr_ntoa(&ipaddr));
 		return ERR_RTE;
 	}
 }
@@ -322,7 +324,7 @@ static void wireguardif_process_data_message(struct wireguard_device *device, st
 							// Also check packet length!
 #if LWIP_IPV4
 							if (IPH_V(iphdr) == 4) {
-								ip_addr_copy_from_ip4(dest, iphdr->dest);
+								ip_addr_copy_from_ip4(dest, iphdr->src);
 								for (x=0; x < WIREGUARD_MAX_SRC_IPS; x++) {
 									if (peer->allowed_source_ips[x].valid) {
 										if (ip_addr_netcmp(&dest, &peer->allowed_source_ips[x].ip, ip_2_ip4(&peer->allowed_source_ips[x].mask))) {
@@ -331,6 +333,19 @@ static void wireguardif_process_data_message(struct wireguard_device *device, st
 											break;
 										}
 									}
+								}
+								if (!dest_ok) {
+									log_i(TAG "rx drop src=%s (no AllowedIPs source match)", ipaddr_ntoa(&dest));
+									for (x=0; x < WIREGUARD_MAX_SRC_IPS; x++) {
+										if (peer->allowed_source_ips[x].valid) {
+											log_i(TAG "allowed[%d]=%s mask=%s",
+												x,
+												ipaddr_ntoa(&peer->allowed_source_ips[x].ip),
+												ipaddr_ntoa(&peer->allowed_source_ips[x].mask));
+										}
+									}
+								} else {
+									log_i(TAG "rx pass src=%s (AllowedIPs source match)", ipaddr_ntoa(&dest));
 								}
 							}
 #endif /* LWIP_IPV4 */
@@ -783,7 +798,11 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 				result = ERR_MEM;
 			}
 		} else {
-			result = ERR_OK;
+			if (peer_add_ip(peer, p->allowed_ip, p->allowed_mask)) {
+				result = ERR_OK;
+			} else {
+				result = ERR_MEM;
+			}
 		}
 	} else {
 		result = ERR_ARG;
