@@ -22,7 +22,7 @@ extern "C" {
 }
 
 // Wireguard instance
-static struct netif wg_netif_struct = {0};
+static struct netif wg_netif_struct = {};
 static struct netif *wg_netif = NULL;
 static struct netif *previous_default_netif = NULL;
 static uint8_t wireguard_peer_index = WIREGUARDIF_INVALID_INDEX;

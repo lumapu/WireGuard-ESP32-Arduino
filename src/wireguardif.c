@@ -48,13 +48,15 @@
 #include "wireguard.h"
 #include "crypto.h"
 #include "esp_log.h"
-#include "tcpip_adapter.h"
+#include "esp_netif.h"
 
 #include "esp32-hal-log.h"
 
 #define WIREGUARDIF_TIMER_MSECS 400
 
 #define TAG "[WireGuard] "
+
+extern void handshake_destroy(struct wireguard_handshake *handshake);
 
 static void update_peer_addr(struct wireguard_peer *peer, const ip_addr_t *addr, u16_t port) {
 	peer->ip = *addr;
@@ -764,7 +766,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 	size_t public_key_len = sizeof(public_key);
 	struct wireguard_peer *peer = NULL;
 
-	uint32_t t1 = wireguard_sys_now();
+	wireguard_sys_now();
 
 	if (wireguard_base64_decode(p->public_key, public_key, &public_key_len)
 			&& (public_key_len == WIREGUARD_PUBLIC_KEY_LEN)) {
@@ -808,7 +810,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 		result = ERR_ARG;
 	}
 
-	uint32_t t2 = wireguard_sys_now();
+	wireguard_sys_now();
 	log_i(TAG "Adding peer took %ums\r\n", (t2-t1));
 
 	if (peer_index) {
@@ -960,7 +962,7 @@ err_t wireguardif_init(struct netif *netif) {
 			underlying_netif = init_data->bind_netif;
 			log_i(TAG "underlying_netif = %p (from bind_netif)", underlying_netif);
 		} else {
-			tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
+			tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, (void **)&underlying_netif);
 			log_i(TAG "underlying_netif = %p (from TCPIP_ADAPTER_IF_STA)", underlying_netif);
 		}
 
@@ -981,9 +983,9 @@ err_t wireguardif_init(struct netif *netif) {
 						device->udp_pcb = udp;
 						log_d(TAG "start device initialization");
 						// Per-wireguard netif/device setup
-						uint32_t t1 = wireguard_sys_now();
+						wireguard_sys_now();
 						if (wireguard_device_init(device, private_key)) {
-							uint32_t t2 = wireguard_sys_now();
+							wireguard_sys_now();
 							log_d(TAG "Device init took %ums\r\n", (t2-t1));
 
 #if LWIP_CHECKSUM_CTRL_PER_NETIF
